@@ -1,0 +1,9 @@
+input,level,error_leave_one_year_out_2012_2021,error_holdout_2022_2025
+Terra+Aqua,"whole region, monthly",0.085,0.125
+Terra+Aqua,"whole region, yearly",0.061,0.089
+Terra+Aqua,"2-degree block, monthly",0.223,0.324
+Terra+Aqua,"0.25-degree cell, monthly",0.496,0.699
+Terra only,"whole region, monthly",0.131,0.278
+Terra only,"whole region, yearly",0.072,0.258
+Terra only,"2-degree block, monthly",0.353,0.551
+Terra only,"0.25-degree cell, monthly",0.763,0.983
