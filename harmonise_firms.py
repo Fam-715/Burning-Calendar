@@ -4,7 +4,7 @@
 #
 # Input : firms_clean/modis_MY_ID.csv, viirs-snpp_MY_ID.csv, viirs-jpss1_MY_ID.csv
 #         (optional) firms_2026/*.csv  - FIRMS archive-request files for 2026
-# Output: firms_harmonised/harmonised_grid_monthly.csv
+# Output: firms_harmonised/harmonised_grid_monthly.csv.gz
 #         firms_harmonised/scaling_factors.csv
 #         firms_harmonised/validation.csv
 #
@@ -38,7 +38,7 @@ N20_START     = "2018-04"   # first full month of NOAA-20
 TERRA_ONLY_TO = "2002-07"   # Aqua data begins 4 July 2002
 
 USE = ["latitude", "longitude", "acq_date", "satellite", "instrument",
-       "confidence", "daynight", "type"]
+       "confidence", "daynight", "type", "country"]
 
 # ---------------- 1. load and clean ----------------
 def clean(df):
@@ -67,7 +67,9 @@ def load(path):
     df = clean(df)
     df["sensor"] = sensor_of(df)
     print(f"  {os.path.basename(path):32s} {n0:>9,} rows -> {len(df):>9,} kept")
-    return df[["latitude", "longitude", "acq_date", "daynight", "sensor"]]
+    if "country" not in df.columns:              # request files have no country column
+        df["country"] = np.nan
+    return df[["latitude", "longitude", "acq_date", "daynight", "sensor", "country"]]
 
 print("Loading and cleaning")
 parts = [load(f"{IN_DIR}/{n}_MY_ID.csv") for n in ["modis", "viirs-snpp", "viirs-jpss1"]]
@@ -88,6 +90,11 @@ grid = (pts.groupby(key + ["sensor"]).size().unstack("sensor", fill_value=0)
            .reindex(columns=["terra", "aqua", "snpp", "n20"], fill_value=0)
            .reset_index())
 grid["modis"] = grid["terra"] + grid["aqua"]
+# country of each cell = the country most of its detections fall in
+cell_country = (pts.dropna(subset=["country"]).groupby(["gy", "gx"])["country"]
+                   .agg(lambda s: s.value_counts().index[0]).rename("country"))
+grid = grid.merge(cell_country, on=["gy", "gx"], how="left")
+grid["country"] = grid["country"].fillna("Other")
 grid["year"]  = grid["ym"].str[:4].astype(int)
 grid["by"] = np.floor(grid["gy"] * CELL / BLOCK).astype(int)
 grid["bx"] = np.floor(grid["gx"] * CELL / BLOCK).astype(int)
@@ -163,10 +170,10 @@ grid["source"] = np.select(
 
 out = grid.assign(lat=(grid["gy"] + 0.5) * CELL, lon=(grid["gx"] + 0.5) * CELL,
                   month=grid["ym"].str[5:].astype(int))
-out = out[["ym", "year", "month", "lat", "lon", "daynight", "hotspots", "source",
+out = out[["ym", "year", "month", "lat", "lon", "country", "daynight", "hotspots", "source",
            "modis", "snpp", "n20"]].rename(
            columns={"modis": "modis_raw", "snpp": "snpp_raw", "n20": "n20_raw"})
-out.to_csv(f"{OUT_DIR}/harmonised_grid_monthly.csv", index=False)
+out.to_csv(f"{OUT_DIR}/harmonised_grid_monthly.csv.gz", index=False)
 
 fac = (f_m.rename(columns={"factor": "factor_terra_aqua"})
           .join(f_t.rename(columns={"factor": "factor_terra_only"})).reset_index())
@@ -178,4 +185,4 @@ print("  Terra+Aqua:", r0_m.round(2).to_dict(), "| Terra only:", r0_t.round(2).t
 yearly = out.groupby("year")[["modis_raw", "snpp_raw", "n20_raw", "hotspots"]].sum().round(0).astype(int)
 print("\nYearly totals, raw vs harmonised:")
 print(yearly.to_string())
-print(f"\nSaved {len(out):,} rows to {OUT_DIR}/harmonised_grid_monthly.csv")
+print(f"\nSaved {len(out):,} rows to {OUT_DIR}/harmonised_grid_monthly.csv.gz")
