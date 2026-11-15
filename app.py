@@ -224,8 +224,14 @@ with tab_month:
     hist["which"] = np.where(hist["year"] == pick_year, str(pick_year), "Other years")
 
     a, b, c = st.columns(3)
-    a.metric(f"{pick_month} {pick_year}", f"{row['hotspots']:,.0f}")
-    b.metric(f"Usual {pick_month} (median, {first_year}–{last_year})", f"{row['usual']:,.0f}")
+    # each card carries a note, so all three are the same height
+    rank = int((hist["hotspots"] > row["hotspots"]).sum()) + 1
+    suffix = "th" if 10 <= rank % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
+    ordinal = str(rank) + suffix
+    a.metric(f"{pick_month} {pick_year}", f"{row['hotspots']:,.0f}",
+             f"{ordinal} highest of {len(hist)}", delta_color="off", delta_arrow="off")
+    b.metric(f"Usual {pick_month} (median, {first_year}–{last_year})", f"{row['usual']:,.0f}",
+             f"median of {len(hist)} years", delta_color="off", delta_arrow="off")
     diff = (row["hotspots"] - row["usual"]) / row["usual"] * 100 if row["usual"] else 0.0
     c.metric("Difference", f"{diff:+.0f}%",
              f"{row['times_usual']:.1f} times the usual", delta_color="off", delta_arrow="off")
