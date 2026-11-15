@@ -24,22 +24,85 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
 
-/* ---------- page: deep orbital night with a still starfield ---------- */
+/* ---------- page: deep orbital night, fire glow on the horizon ---------- */
 .stApp {
-  background-color: #060912;
+  isolation: isolate;
+  background-color: #05070f;
   background-image:
-    radial-gradient(1px 1px at 23px 41px, rgba(255,255,255,.55), transparent 60%),
-    radial-gradient(1px 1px at 131px 97px, rgba(200,220,255,.45), transparent 60%),
-    radial-gradient(1.5px 1.5px at 71px 163px, rgba(255,255,255,.35), transparent 60%),
-    radial-gradient(1px 1px at 211px 19px, rgba(255,236,210,.40), transparent 60%),
-    radial-gradient(1px 1px at 301px 233px, rgba(255,255,255,.30), transparent 60%);
-  background-size: 260px 260px, 340px 340px, 410px 410px, 530px 530px, 610px 610px;
+    radial-gradient(120% 55% at 50% 118%, rgba(255,106,40,.20), rgba(255,106,40,.05) 45%, transparent 70%),
+    radial-gradient(60% 45% at 88% -5%, rgba(79,157,255,.13), transparent 70%),
+    radial-gradient(45% 40% at 8% 20%, rgba(120,90,255,.07), transparent 70%);
   background-attachment: fixed;
 }
 [data-testid="stHeader"] { background: transparent; }
-[data-testid="stSidebar"] { background: #0a101d; border-right: 1px solid #1a2438; }
+[data-testid="stSidebar"] {
+  background: rgba(9,14,26,.78); border-right: 1px solid #1a2438;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
 [data-testid="stMainBlockContainer"] { padding-top: 2.4rem; }
+
+/* ---------- headline numbers: glass cards that lift ---------- */
+[data-testid="stMetric"] {
+  padding: .9rem 1rem .8rem; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(22,32,56,.66), rgba(9,14,27,.58));
+  border: 1px solid rgba(130,165,230,.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.35);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s ease, box-shadow .25s ease;
+}
+[data-testid="stMetric"]:hover {
+  transform: translateY(-4px); border-color: rgba(255,138,61,.55);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 36px rgba(0,0,0,.45), 0 0 26px rgba(255,120,50,.18);
+}
 [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
+[data-testid="stMetricValue"] p {
+  background: linear-gradient(180deg, #ffffff 25%, #ffc58f 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- sky behind the whole page: stars, meteors, rising embers ---------- */
+.bc-sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bc-stars { position: absolute; inset: 0; }
+.bc-stars-a {
+  background-image:
+    radial-gradient(1px 1px at 23px 41px, rgba(255,255,255,.75), transparent 60%),
+    radial-gradient(1px 1px at 131px 97px, rgba(200,220,255,.60), transparent 60%),
+    radial-gradient(1.5px 1.5px at 71px 163px, rgba(255,255,255,.50), transparent 60%);
+  background-size: 260px 260px, 340px 340px, 410px 410px;
+  animation: bc-twinkle 6s ease-in-out infinite alternate;
+}
+.bc-stars-b {
+  background-image:
+    radial-gradient(1px 1px at 211px 19px, rgba(255,236,210,.65), transparent 60%),
+    radial-gradient(1px 1px at 301px 233px, rgba(255,255,255,.50), transparent 60%),
+    radial-gradient(2px 2px at 417px 120px, rgba(190,215,255,.55), transparent 60%);
+  background-size: 530px 530px, 610px 610px, 790px 790px;
+  animation: bc-twinkle 9s ease-in-out -4s infinite alternate-reverse;
+}
+.bc-meteor {
+  position: absolute; top: var(--top); left: var(--left); width: 170px; height: 1.5px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(255,190,130,.55) 25%, rgba(255,140,60,0));
+  filter: drop-shadow(0 0 5px rgba(255,200,150,.7));
+  opacity: 0; animation: bc-meteor var(--t) linear var(--d) infinite;
+}
+.bc-ember {
+  position: absolute; bottom: -12px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%;
+  background: #ffc98a;
+  box-shadow: 0 0 6px 2px rgba(255,138,61,.7), 0 0 14px 4px rgba(255,90,30,.25);
+  opacity: 0; animation: bc-rise var(--t) linear var(--d) infinite;
+}
+@keyframes bc-meteor {
+  0%   { transform: rotate(-32deg) translateX(0); opacity: 0; }
+  1.5% { opacity: 1; }
+  9%   { transform: rotate(-32deg) translateX(-780px); opacity: 0; }
+  100% { transform: rotate(-32deg) translateX(-780px); opacity: 0; }
+}
+@keyframes bc-rise {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  8%   { opacity: .85; }
+  50%  { transform: translate(var(--w), -34vh); opacity: .55; }
+  100% { transform: translate(calc(var(--w) * -0.6), -72vh); opacity: 0; }
+}
 
 /* ---------- hero: a satellite pass over the night side ---------- */
 .bc-hero {
@@ -110,29 +173,47 @@ CSS = """
 .bc-row { display: grid; grid-template-columns: 3rem repeat(12, minmax(0, 1fr)); gap: 3px; margin-bottom: 3px; }
 .bc-head span { text-align: center; color: #8b97ad; font-size: .8rem; padding-bottom: 2px; }
 .bc-yr { color: #8b97ad; font-size: .8rem; line-height: 22px; font-variant-numeric: tabular-nums; }
+.bc-yr { transition: color .2s ease; }
+.bc-head span { transition: color .2s ease; }
+.bc-row:hover .bc-yr { color: #ffb072; }
+/*MONTH_RULES*/
 .bc-cell {
-  position: relative; height: 22px; border-radius: 3px; background: var(--c);
-  transition: transform .17s cubic-bezier(.2,.8,.2,1), box-shadow .17s ease;
+  position: relative; height: 24px; border-radius: 4px; background: var(--c);
+  transition: transform .24s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, opacity .25s ease;
+  animation: bc-ignite .45s cubic-bezier(.2,.8,.2,1) backwards;
+  animation-delay: calc(var(--i) * 16ms);
 }
+/* the square under the pointer pops out of the grid; the rest fall back */
+.bc-cal:has(.bc-cell:hover) .bc-cell:not(:hover) { opacity: .45; }
 .bc-cell:hover {
-  transform: scale(1.3) translateY(-2px); z-index: 20;
-  box-shadow: 0 8px 22px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.85), 0 0 18px var(--c);
+  transform: scale(1.6) translateY(-3px); z-index: 20;
+  box-shadow: 0 12px 28px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.9), 0 0 26px 2px var(--c);
 }
-.bc-empty { height: 22px; border-radius: 3px; border: 1px dashed #1c2740; }
+/* the fiercest months smoulder */
+.bc-hot::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 11px 1px var(--c);
+  animation: bc-smoulder 2.6s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -170ms);
+}
+@keyframes bc-ignite { from { opacity: 0; transform: scale(.3); filter: brightness(2.2); } }
+@keyframes bc-smoulder { from { opacity: .15; } to { opacity: .9; } }
+.bc-yr { line-height: 24px; }
+.bc-empty { height: 24px; border-radius: 4px; border: 1px dashed #1c2740; }
 .bc-tip {
-  position: absolute; bottom: calc(100% + 7px); left: 50%; width: 15rem;
-  transform: translateX(-50%) scale(.77); transform-origin: bottom center;
-  padding: .55rem .7rem; border-radius: 8px; background: #0e1626; border: 1px solid #2a3a58;
-  color: #c3c8d4; font-size: .95rem; line-height: 1.4; text-align: left;
-  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
-  box-shadow: 0 10px 28px rgba(0,0,0,.6);
+  position: absolute; bottom: calc(100% + 9px); left: 50%; width: 18.5rem;
+  transform: translateX(-50%) scale(.625); transform-origin: bottom center;
+  padding: .68rem .86rem; border-radius: 10px; background: rgba(14,22,38,.96); border: 1.6px solid #2a3a58;
+  color: #c3c8d4; font-size: 1.18rem; line-height: 1.4; text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .15s ease .05s;
+  box-shadow: 0 12px 32px rgba(0,0,0,.65);
 }
-.bc-tip b { display: block; color: #eef2fa; font-size: 1.05rem; }
-.bc-tip i { display: block; font-style: normal; color: #8b97ad; font-size: .85rem; margin-top: .15rem; }
+.bc-tip b { display: block; color: #eef2fa; font-size: 1.3rem; }
+.bc-tip i { display: block; font-style: normal; color: #8b97ad; font-size: 1.05rem; margin-top: .2rem; }
 .bc-cell:hover .bc-tip { opacity: 1; visibility: visible; }
-.bc-left .bc-tip  { left: 0; transform: scale(.77); transform-origin: bottom left; }
-.bc-right .bc-tip { left: auto; right: 0; transform: scale(.77); transform-origin: bottom right; }
-.bc-low .bc-tip   { bottom: auto; top: calc(100% + 7px); }
+.bc-left .bc-tip  { left: 0; transform: scale(.625); transform-origin: bottom left; }
+.bc-right .bc-tip { left: auto; right: 0; transform: scale(.625); transform-origin: bottom right; }
+.bc-low .bc-tip   { bottom: auto; top: calc(100% + 9px); }
 .bc-low.bc-cell .bc-tip { transform-origin: top center; }
 .bc-low.bc-left .bc-tip { transform-origin: top left; }
 .bc-low.bc-right .bc-tip { transform-origin: top right; }
@@ -145,11 +226,26 @@ CSS = """
 .bc-legend > span { line-height: 10px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .bc-hero-stars, .bc-fire, .bc-orbit { animation: none; }
-  .bc-cell, .bc-tip { transition: none; }
+  .bc-hero-stars, .bc-fire, .bc-orbit, .bc-stars, .bc-cell, .bc-hot::after { animation: none; }
+  .bc-meteor, .bc-ember { display: none; }
+  .bc-cell, .bc-tip, [data-testid="stMetric"] { transition: none; }
 }
 </style>
 """
+
+# hovering a square lights up its month heading
+CSS = CSS.replace("/*MONTH_RULES*/", "\n".join(
+    f".bc-cal:has(.bc-m{m}:hover) .bc-head span:nth-child({m + 1}) {{ color: #ffb072; }}"
+    for m in range(1, 13)))
+
+# meteors: (top, left, cycle seconds, delay seconds)
+METEORS = [("6%", "78%", 11, 1.5), ("18%", "96%", 17, 6.0), ("2%", "52%", 23, 12.0), ("30%", "99%", 14, 9.0)]
+
+# embers rising from the fire glow: (left %, size px, rise seconds, delay seconds, sideways drift px)
+EMBERS = [(4, 3, 19, -2, 30), (11, 2, 24, -14, -24), (17, 4, 21, -8, 40), (24, 2, 27, -20, -34),
+          (31, 3, 18, -5, 22), (38, 2, 25, -17, -28), (45, 3, 22, -11, 36), (52, 2, 28, -3, -20),
+          (59, 4, 20, -15, 28), (66, 2, 26, -9, -38), (73, 3, 19, -18, 24), (80, 2, 23, -6, -30),
+          (87, 3, 27, -22, 34), (94, 2, 21, -12, -22)]
 
 SATELLITE = ('<div class="bc-sat"><span class="bc-panel"></span>'
              '<span class="bc-body"></span><span class="bc-panel"></span></div>')
@@ -168,7 +264,16 @@ def hero(first_year, last_year):
     fires = "".join(
         f'<span class="bc-fire" style="--a:{a}deg;--y:{y}px;--t:{t}s;--d:{d}s"></span>'
         for a, y, t, d in FIRES)
+    meteors = "".join(
+        f'<span class="bc-meteor" style="--top:{top};--left:{left};--t:{t}s;--d:{d}s"></span>'
+        for top, left, t, d in METEORS)
+    embers = "".join(
+        f'<span class="bc-ember" style="--x:{x}%;--s:{s}px;--t:{t}s;--d:{d}s;--w:{w}px"></span>'
+        for x, s, t, d, w in EMBERS)
     st.html(f"""
+<div class="bc-sky" aria-hidden="true">
+  <div class="bc-stars bc-stars-a"></div><div class="bc-stars bc-stars-b"></div>{meteors}{embers}
+</div>
 <div class="bc-hero" role="img" aria-label="A satellite passing over fire hotspots on the night side of the Earth">
   <div class="bc-hero-stars"></div>
   <div class="bc-earth">{fires}</div>
@@ -242,7 +347,9 @@ def calendar(view, by_count=True):
             tip = (f"<b>{MONTHS[month - 1]} {year}: {r.hotspots:,.0f} hotspots</b>"
                    f"Usual {MONTHS[month - 1]}: {r.usual:,.0f} ({r.times_usual:.1f} times)"
                    f"<i>{html.escape(r.source)}</i>")
-            cells.append(f'<div class="bc-cell{side}{low}" style="--c:{colour}"><span class="bc-tip">{tip}</span></div>')
+            hot = " bc-hot" if t >= 0.8 else ""
+            cells.append(f'<div class="bc-cell bc-m{month}{side}{low}{hot}" style="--c:{colour};--i:{i + month}">'
+                         f'<span class="bc-tip">{tip}</span></div>')
         out.append('<div class="bc-row">' + "".join(cells) + "</div>")
     out.append("</div>")
     st.html("".join(out))

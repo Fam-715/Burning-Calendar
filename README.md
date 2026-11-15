@@ -5,7 +5,7 @@ Challenge: *Harmonization of MODIS and VIIRS Hot Spots*
 
 Burning Calendar turns 25 years of NASA fire detections into one consistent record for Malaysia and Indonesia. Pick an area and a period, and it shows when fires usually peak, which years were worst, and whether a given month is unusual.
 
-**Live app:** (https://burning-calendar-app.streamlit.app/)
+**Live app:** [burning-calendar-app.streamlit.app](https://burning-calendar-app.streamlit.app/)
 
 ## Why it is needed
 
