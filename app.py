@@ -14,12 +14,14 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 
+import space_ui as ui
+from space_ui import BLUE, ORANGE, GREY, INK2
+
 st.set_page_config(page_title="Burning Calendar", page_icon="🔥", layout="wide")
 
 DATA = Path(__file__).parent / "data"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-BLUE, ORANGE, GREY = "#2a78d6", "#eb6834", "#c3c2b7"
 SMALL_AREA_DEG2 = 4          # below this the estimate gets noticeably less reliable
 
 # name -> (country filter, south, north, west, east)
@@ -90,10 +92,9 @@ if country:
 if dn_label != "Day and night":
     sel = sel[sel["daynight"] == dn_label[0]]
 
-st.title("Burning Calendar")
-st.caption("One consistent fire record from 2000 to today, built by harmonising NASA's "
-           "MODIS and VIIRS active-fire hotspots (FIRMS). All counts are in "
-           "VIIRS-equivalent hotspots.")
+ui.inject_css()
+ui.hero(first_year, last_year)
+st.caption("All counts are in VIIRS-equivalent hotspots, from NASA FIRMS active-fire data.")
 
 if sel.empty:
     st.info("No hotspots were recorded in this area. Try a larger box or another region.")
@@ -121,7 +122,9 @@ latest = m.iloc[-1]
 
 # ---------------- headline numbers ----------------
 k1, k2, k3, k4 = st.columns(4)
-k1.metric(f"Hotspots, {y0} to {y1}", f"{view['hotspots'].sum():,.0f}")
+total = view["hotspots"].sum()
+k1.metric("Total hotspots", f"{total / 1e6:.2f}M" if total >= 1e6 else f"{total:,.0f}")
+k1.caption(f"{y0} to {y1}")
 if len(annual):
     worst = int(annual["hotspots"].idxmax())
     note = " (estimated from MODIS)" if worst < 2012 else ""
@@ -130,8 +133,8 @@ if len(annual):
 k3.metric("Usual peak month", MONTHS[int(season.idxmax()) - 1])
 k3.caption(f"median {season.max():,.0f} hotspots")
 change = (latest["hotspots"] - latest["usual"]) / latest["usual"] * 100 if latest["usual"] else 0.0
-k4.metric(f"Latest month ({latest['label']})", f"{latest['hotspots']:,.0f}",
-          f"{change:+.0f}% vs usual {latest['mon']}", delta_color="inverse")
+k4.metric(f"Latest: {latest['label']}", f"{latest['hotspots']:,.0f}",
+          f"{change:+.0f}% vs usual", delta_color="inverse")
 
 if (north - south) * (east - west) < SMALL_AREA_DEG2:
     st.warning("This is a small area. Before 2012 the counts are estimated from MODIS, and "
@@ -152,23 +155,8 @@ with tab_cal:
     st.subheader(f"{area_name}: hotspots by month")
     mode = st.radio("Colour shows", ["Number of hotspots", "Compared with the usual for that month"],
                     horizontal=True, label_visibility="collapsed")
-    if mode == "Number of hotspots":
-        colour = alt.Color("hotspots:Q", scale=alt.Scale(type="sqrt", scheme="oranges"),
-                           legend=alt.Legend(title="Hotspots", format="~s"))
-    else:
-        colour = alt.Color("log_ratio:Q",
-                           scale=alt.Scale(domain=[-3, 3], domainMid=0, scheme="redblue", reverse=True),
-                           legend=alt.Legend(title="Times the usual", values=[-3, -2, -1, 0, 1, 2, 3],
-                                             labelExpr="datum.value < 0 ? '1/' + pow(2, -datum.value) + '×' "
-                                                       ": pow(2, datum.value) + '×'"))
-    calendar = (alt.Chart(view).mark_rect(stroke="white", strokeWidth=2)
-                .encode(x=alt.X("mon:O", sort=MONTHS, title=None,
-                                axis=alt.Axis(orient="top", labelAngle=0, ticks=False, domain=False)),
-                        y=alt.Y("year:O", title=None, axis=alt.Axis(ticks=False, domain=False)),
-                        color=colour, tooltip=TIP)
-                .properties(height=max(160, 22 * (y1 - y0 + 1))))
-    st.altair_chart(calendar, width="stretch")
-    st.caption("Each square is one month. Hover for the figures. Before February 2012 the counts are "
+    ui.calendar(view, by_count=(mode == "Number of hotspots"))
+    st.caption("Each square is one month. Hover over a square to lift it and see the figures. Before February 2012 the counts are "
                "MODIS detections scaled to VIIRS-equivalent; from then on they are VIIRS observations. "
                "\"Usual\" is the median for that calendar month across the whole record.")
 
@@ -211,7 +199,7 @@ with tab_month:
                                     legend=alt.Legend(title=None, orient="top")),
                     tooltip=TIP))
     med = pd.DataFrame({"usual": [row["usual"]]})
-    rule = alt.Chart(med).mark_rule(color="#52514e", strokeWidth=1.5).encode(y="usual:Q")
+    rule = alt.Chart(med).mark_rule(color=INK2, strokeWidth=1.5).encode(y="usual:Q")
     st.altair_chart((bars + rule).properties(height=320), width="stretch")
     st.caption(f"The horizontal line is the median {pick_month} ({row['usual']:,.0f} hotspots).")
 
@@ -241,7 +229,7 @@ with tab_trend:
                          tooltip=[alt.Tooltip("year:O", title="Year"), alt.Tooltip("series:N", title="Series"),
                                   alt.Tooltip("count:Q", title="Hotspots", format=",.0f")]))
         ends = (alt.Chart(long[long["year"] == long["year"].max()])
-                .mark_text(align="left", dx=8, color="#52514e")
+                .mark_text(align="left", dx=8, color=INK2)
                 .encode(x="year:O", y="count:Q", text="series:N"))
         st.altair_chart((lines + ends).properties(height=360, padding={"right": 80}), width="stretch")
         ratio = annual["hotspots"].sum() / max(annual["modis_raw"].sum(), 1)
@@ -258,19 +246,21 @@ with tab_map:
     top = cells_sum["hotspots"].max()
     cells_sum["radius"] = 3000 + 10000 * np.sqrt(cells_sum["hotspots"] / top)
     cells_sum["text"] = cells_sum["hotspots"].map(lambda v: f"{v:,.0f} hotspots")
+    # darker = more hotspots, so the pattern still shows when zoomed far out
+    cells_sum["colour"] = [[255, 138, 61, int(a)] for a in 45 + 200 * np.sqrt(cells_sum["hotspots"] / top)]
     box = pd.DataFrame({"path": [[[west, south], [east, south], [east, north], [west, north], [west, south]]]})
     layers = [
         pdk.Layer("ScatterplotLayer", cells_sum, get_position="[lon, lat]", get_radius="radius",
-                  get_fill_color=[235, 104, 52, 160], radius_min_pixels=2, pickable=True),
-        pdk.Layer("PathLayer", box, get_path="path", get_color=[42, 120, 214], width_min_pixels=2),
+                  get_fill_color="colour", radius_min_pixels=2, pickable=True),
+        pdk.Layer("PathLayer", box, get_path="path", get_color=[79, 157, 255], width_min_pixels=2),
     ]
     span = max(north - south, (east - west) / 2)
     zoom = float(np.clip(8.0 - np.log2(max(span, 0.5)), 3, 9))
-    st.pydeck_chart(pdk.Deck(layers=layers, map_style="light",
+    st.pydeck_chart(pdk.Deck(layers=layers, map_style="dark",
                              initial_view_state=pdk.ViewState(latitude=(south + north) / 2,
                                                               longitude=(west + east) / 2, zoom=zoom),
                              tooltip={"text": "{text}"}))
-    st.caption("Each circle is one 0.25° grid cell (about 28 km). Bigger circles mean more hotspots. "
+    st.caption("Each circle is one 0.25° grid cell (about 28 km). Bigger, brighter circles mean more hotspots. "
                "The blue outline is the selected area.")
 
 # ---------------- 5. method ----------------
