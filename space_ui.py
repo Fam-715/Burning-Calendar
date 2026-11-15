@@ -229,8 +229,11 @@ CSS = """
    Uses CSS scroll-driven animations (Chrome, Edge, Safari 26+).
    Other browsers skip this block and show the page still. */
 .bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
-/* 0 = not yet seen, 1 = seen. Registered so it starts at 0 before the page has been laid out. */
-@property --bc-seen { syntax: "<integer>"; inherits: true; initial-value: 0; }
+/* 0 = not yet seen, 1 = seen. Registered so it starts at 0 before the page has been laid out.
+   The syntax is "integer" in angle brackets, written with CSS escapes (3C and 3E), because
+   st.html discards a whole style block if its text contains anything that looks like an HTML
+   tag. Never type an angle bracket anywhere in this stylesheet. */
+@property --bc-seen { syntax: "\\3C integer\\3E"; inherits: true; initial-value: 0; }
 @supports (animation-timeline: view()) {
   [data-testid="stMain"] { scroll-timeline: --bc-page block; }
 
