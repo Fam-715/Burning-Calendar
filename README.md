@@ -62,7 +62,3 @@ streamlit run app.py
 ## Data
 
 NASA FIRMS (Fire Information for Resource Management System) active fire products: MODIS Collection 6.1 and VIIRS 375 m (S-NPP and NOAA-20), yearly country files for Malaysia and Indonesia. https://www.earthdata.nasa.gov/data/tools/firms
-
-## Use of AI
-
-The data pipeline and app code were written with AI assistance (Claude) and checked by the team. The choice of challenge, region and project idea are the team's own.
