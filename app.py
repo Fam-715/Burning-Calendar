@@ -14,7 +14,11 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 
+import importlib
+
 import space_ui as ui
+
+ui = importlib.reload(ui)   # pick up design changes without rebooting the app
 from space_ui import BLUE, ORANGE, GREY, INK2
 
 st.set_page_config(page_title="Burning Calendar", page_icon="🔥", layout="wide")

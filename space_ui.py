@@ -225,7 +225,70 @@ CSS = """
 .bc-ticks span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
 .bc-legend > span { line-height: 10px; }
 
+/* ---------- motion tied to scrolling ----------
+   Uses CSS scroll-driven animations (Chrome, Edge, Safari 26+).
+   Other browsers skip this block and show the page still. */
+.bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
+@supports (animation-timeline: view()) {
+  [data-testid="stMain"] { scroll-timeline: --bc-page block; }
+
+  /* each block rises into place as it enters the screen */
+  [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:not(:has(.bc-sky)) {
+    animation: bc-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 150px;
+  }
+  /* the banner sinks back as it leaves */
+  .bc-hero { animation: bc-hero-out linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
+
+  /* burn line across the top: how far down the page you are */
+  .bc-progress {
+    display: block; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 999999;
+    transform-origin: 0 50%; transform: scaleX(0); pointer-events: none;
+    background: linear-gradient(90deg, #a53d14, #ff8a3d 60%, #ffe2b8);
+    box-shadow: 0 0 12px rgba(255,138,61,.8);
+    animation: bc-progress linear both; animation-timeline: --bc-page;
+  }
+
+  /* stars drift at two depths */
+  .bc-stars { inset: 0 0 -40% 0; }
+  .bc-stars-a { animation: bc-twinkle 6s ease-in-out infinite alternate, bc-drift-a linear both;
+                animation-timeline: auto, --bc-page; }
+  .bc-stars-b { animation: bc-twinkle 9s ease-in-out -4s infinite alternate-reverse, bc-drift-b linear both;
+                animation-timeline: auto, --bc-page; }
+
+  /* the fire glow strengthens and the burning Earth rises as you descend */
+  .bc-glow {
+    display: block; position: absolute; left: 0; right: 0; bottom: 0; height: 65vh;
+    background: radial-gradient(90% 100% at 50% 100%, rgba(255,106,40,.30), rgba(255,106,40,.07) 50%, transparent 72%);
+    animation: bc-glow linear both; animation-timeline: --bc-page;
+  }
+  .bc-limb {
+    display: block; position: absolute; left: 50%; top: 100%; width: 4800px; height: 4800px;
+    margin-left: -2400px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 0%, #1a2c4a 0, #0a1426 3%, #060b16 8%);
+    box-shadow: 0 0 60px 6px rgba(255,120,50,.28), 0 0 2px 1px rgba(255,200,160,.7);
+    animation: bc-limb linear both; animation-timeline: --bc-page;
+  }
+
+  /* a satellite tracks down the right edge with the scroll position */
+  .bc-scan { display: block; position: absolute; right: 30px; top: 12vh; bottom: 14vh; width: 1px;
+             background: linear-gradient(180deg, transparent, rgba(120,170,255,.28) 12%, rgba(120,170,255,.28) 88%, transparent); }
+  .bc-scan-sat { position: absolute; left: 0; top: 0; width: 0; height: 0;
+                 animation: bc-descend linear both; animation-timeline: --bc-page; }
+
+  @keyframes bc-reveal   { from { opacity: 0; transform: translateY(40px) scale(.97); } }
+  @keyframes bc-hero-out { to { opacity: .2; transform: translateY(40px) scale(.93); } }
+  @keyframes bc-progress { to { transform: scaleX(1); } }
+  @keyframes bc-drift-a  { to { transform: translateY(-10%); } }
+  @keyframes bc-drift-b  { to { transform: translateY(-24%); } }
+  @keyframes bc-glow     { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes bc-limb     { to { transform: translateY(-150px); } }
+  @keyframes bc-descend  { to { transform: translateY(74vh); } }
+}
+@media (max-width: 900px) { .bc-scan { display: none; } }
+
 @media (prefers-reduced-motion: reduce) {
+  .bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
+  [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"], .bc-hero { animation: none; }
   .bc-hero-stars, .bc-fire, .bc-orbit, .bc-stars, .bc-cell, .bc-hot::after { animation: none; }
   .bc-meteor, .bc-ember { display: none; }
   .bc-cell, .bc-tip, [data-testid="stMetric"] { transition: none; }
@@ -272,8 +335,12 @@ def hero(first_year, last_year):
         for x, s, t, d, w in EMBERS)
     st.html(f"""
 <div class="bc-sky" aria-hidden="true">
-  <div class="bc-stars bc-stars-a"></div><div class="bc-stars bc-stars-b"></div>{meteors}{embers}
+  <div class="bc-stars bc-stars-a"></div><div class="bc-stars bc-stars-b"></div>
+  <div class="bc-glow"></div><div class="bc-limb">{fires}</div>
+  <div class="bc-scan"><div class="bc-scan-sat"><div class="bc-beam"></div>{SATELLITE}</div></div>
+  {meteors}{embers}
 </div>
+<div class="bc-progress" aria-hidden="true"></div>
 <div class="bc-hero" role="img" aria-label="A satellite passing over fire hotspots on the night side of the Earth">
   <div class="bc-hero-stars"></div>
   <div class="bc-earth">{fires}</div>
