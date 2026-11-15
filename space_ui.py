@@ -229,17 +229,14 @@ CSS = """
    Uses CSS scroll-driven animations (Chrome, Edge, Safari 26+).
    Other browsers skip this block and show the page still. */
 .bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
+/* 0 = not yet seen, 1 = seen. Registered so it starts at 0 before the page has been laid out. */
+@property --bc-seen { syntax: "<integer>"; inherits: true; initial-value: 0; }
 @supports (animation-timeline: view()) {
   [data-testid="stMain"] { scroll-timeline: --bc-page block; }
 
-  /* each block rises into place as it enters the screen, and is marked "seen" (--bc-seen: 1)
-     once most of it is on screen; the rules further down start their animations from that mark */
+  /* each block, and each calendar row, is marked "seen" (--bc-seen: 1) once most of it is on screen;
+     the rules further down start their animations from that mark */
   [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:not(:has(.bc-sky)) {
-    animation: bc-reveal linear both, bc-seen linear both; animation-timeline: view(), view();
-    animation-range: entry 0% entry 150px, entry 20% entry 100%;
-  }
-  /* charts, the map, number cards and the calendar skip the rise: they stay hidden, then play in full */
-  [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:has([data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"], .bc-cal) {
     animation: bc-seen linear both; animation-timeline: view(); animation-range: entry 20% entry 100%;
   }
   .bc-row:not(.bc-head) { animation: bc-seen linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
@@ -285,29 +282,6 @@ CSS = """
   /* room below the last block so everything can finish animating in */
   [data-testid="stMainBlockContainer"] { padding-bottom: 12rem; }
 
-  /* Not yet seen: hidden. These rules only exist in browsers with style queries, so nothing
-     can be left hidden in a browser that cannot run the animation. */
-  @container style(--bc-seen: 0) {
-    [data-testid="stVegaLiteChart"] { clip-path: inset(0 100% 0 0); }
-    [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { clip-path: inset(100% 0 0 0); }
-    [data-testid="stDeckGlJsonChart"] { clip-path: circle(0% at 50% 50%); }
-    [data-testid="stMetric"] { opacity: 0; }
-    .bc-cell, .bc-empty, .bc-yr { opacity: 0; animation: none; }
-    [data-testid="stHeading"] h3 { background-size: 0 2px; }
-  }
-  /* Seen: the whole animation plays once, on its own clock, however fast the user scrolls */
-  @container style(--bc-seen: 1) {
-    /* line and scatter charts draw from left to right, bar charts grow up from the baseline */
-    [data-testid="stVegaLiteChart"] { animation: bc-wipe 1.2s cubic-bezier(.3,.6,.2,1) both; }
-    [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { animation-name: bc-grow; }
-    /* the map opens from its centre */
-    [data-testid="stDeckGlJsonChart"] { animation: bc-iris 1.3s cubic-bezier(.3,.6,.2,1) both; }
-    /* number cards pop in ("scale", not "transform", so the hover lift still works) */
-    [data-testid="stMetric"] { animation: bc-pop .6s cubic-bezier(.2,.8,.2,1) both; }
-    /* each calendar row lights up from January to December */
-    .bc-cell { animation-delay: calc((var(--i) - var(--r, 0)) * 28ms); }
-    .bc-yr, .bc-empty { animation: bc-fade .4s ease both; }
-  }
   /* section headings get an ember underline that draws in */
   [data-testid="stHeading"] h3 {
     padding-bottom: .45rem;
@@ -315,13 +289,70 @@ CSS = """
     transition: background-size .8s ease .15s;
   }
 
+  /* Play once. Everything below is a transition, not an animation:
+     - going from "not seen" to "seen" plays the full reveal on its own clock;
+     - going back to "not seen" (the user scrolled up) has a delay of about a day, so what has
+       been revealed stays revealed and nothing replays on the way back down.
+     Switching tabs or loading the page starts fresh.
+     These rules only exist in browsers with style queries, and only when the visitor has not
+     asked for reduced motion, so nothing can be left hidden where the reveal cannot run. */
+  @media (prefers-reduced-motion: no-preference) {
+    @container style(--bc-seen: 0) {
+      /* text, tables and buttons: faded and a little low */
+      [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:not(:has([data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"], .bc-cal, .bc-sky)) > * {
+        opacity: 0; translate: 0 28px; transition: opacity 0s linear 99999s, translate 0s linear 99999s;
+      }
+      /* line and scatter charts wait to be drawn from the left, bar charts from the baseline */
+      [data-testid="stMainBlockContainer"] [data-testid="stVegaLiteChart"] {
+        clip-path: inset(0 100% 0 0); transition: clip-path 0s linear 99999s;
+      }
+      [data-testid="stMainBlockContainer"] [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { clip-path: inset(100% 0 0 0); }
+      /* the map waits to open from its centre */
+      [data-testid="stMainBlockContainer"] [data-testid="stDeckGlJsonChart"] {
+        clip-path: circle(0% at 50% 50%); transition: clip-path 0s linear 99999s;
+      }
+      /* number cards ("scale", not "transform", so the hover lift still works) */
+      [data-testid="stMainBlockContainer"] [data-testid="stMetric"] {
+        opacity: 0; scale: .85;
+        transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s ease, box-shadow .25s ease,
+                    opacity 0s linear 99999s, scale 0s linear 99999s;
+      }
+      /* calendar squares and year labels */
+      .bc-cell {
+        scale: 0; animation: none;
+        transition: transform .24s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, opacity .25s ease,
+                    scale 0s linear 99999s;
+      }
+      .bc-yr, .bc-empty { opacity: 0; animation: none; transition: opacity 0s linear 99999s; }
+      [data-testid="stMainBlockContainer"] [data-testid="stHeading"] h3 {
+        background-size: 0 2px; transition: background-size 0s linear 99999s;
+      }
+    }
+    @container style(--bc-seen: 1) {
+      [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:not(:has([data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"], .bc-cal, .bc-sky)) > * {
+        transition: opacity .6s ease, translate .6s cubic-bezier(.2,.8,.2,1);
+      }
+      [data-testid="stMainBlockContainer"] [data-testid="stVegaLiteChart"] {
+        clip-path: inset(0 0 0 0); transition: clip-path 1.2s cubic-bezier(.3,.6,.2,1);
+      }
+      [data-testid="stMainBlockContainer"] [data-testid="stDeckGlJsonChart"] {
+        clip-path: circle(75% at 50% 50%); transition: clip-path 1.3s cubic-bezier(.3,.6,.2,1);
+      }
+      [data-testid="stMainBlockContainer"] [data-testid="stMetric"] {
+        transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s ease, box-shadow .25s ease,
+                    opacity .5s ease, scale .6s cubic-bezier(.2,.8,.2,1);
+      }
+      /* each calendar row lights up from January to December */
+      .bc-cell {
+        animation: none;
+        transition: transform .24s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, opacity .25s ease,
+                    scale .45s cubic-bezier(.2,.8,.2,1) calc((var(--i) - var(--r, 0)) * 28ms);
+      }
+      .bc-yr, .bc-empty { animation: none; transition: opacity .4s ease, color .2s ease; }
+    }
+  }
+
   @keyframes bc-seen      { from { --bc-seen: 0; } to { --bc-seen: 1; } }
-  @keyframes bc-wipe      { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-  @keyframes bc-grow      { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
-  @keyframes bc-iris      { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
-  @keyframes bc-pop       { from { opacity: 0; scale: .85; } }
-  @keyframes bc-fade      { from { opacity: 0; } }
-  @keyframes bc-reveal   { from { opacity: 0; transform: translateY(40px) scale(.97); } }
   @keyframes bc-hero-out { to { opacity: .2; transform: translateY(40px) scale(.93); } }
   @keyframes bc-progress { to { transform: scaleX(1); } }
   @keyframes bc-drift-a  { to { transform: translateY(-10%); } }
