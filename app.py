@@ -411,8 +411,8 @@ Error is the total absolute difference between scaled MODIS and actual VIIRS, as
 - Reliable for islands, provinces and countries. Not reliable for a single 28 km cell.
 - Quiet fire years are underestimated by roughly 10 to 25%, because MODIS misses more of the small fires.
 - November 2000 to July 2002 uses the Terra satellite alone and is less certain. (The Terra-only factor is applied to those months only. Its error on 2022–2025 is high because Terra's detections fell away in those years.)
-- The most recent months of any update are near-real-time data, not final science quality.
-- The record currently ends in December 2025, the last month in the FIRMS yearly country files. 2026 is not included yet.
+- The record ends in October 2026, the last complete month in the data. January to October 2026 come from a FIRMS archive request rather than the yearly country files.
+- August to October 2026 are near-real-time data, not final science quality. Those files do not say what kind of source each detection is, so volcanoes and gas flares could not be removed for those three months. In the first seven months of 2026 such sources were about 1,700 detections a month, small next to the 140,000 to 213,000 hotspots a month recorded from August to October.
 
 **Data.** NASA FIRMS active fire products: MODIS Collection 6.1 (MCD14ML) and VIIRS 375 m (S-NPP and NOAA-20), for Malaysia and Indonesia.
 """)

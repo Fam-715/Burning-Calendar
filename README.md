@@ -47,7 +47,8 @@ Limits: the record is reliable for islands, provinces and countries, not for sin
 |---|---|
 | `app.py` | The Streamlit web app |
 | `harmonise_firms.py` | Cleans, grids and harmonises the FIRMS data and writes the files in `data/` |
-| `data/harmonised_grid_monthly.csv.gz` | Harmonised monthly hotspots per 0.25° cell, 2000–2025 |
+| `add_2026.ps1` | Adds January to October 2026 from FIRMS archive-request files, using the same cleaning and grid |
+| `data/harmonised_grid_monthly.csv.gz` | Harmonised monthly hotspots per 0.25° cell, November 2000 to October 2026 |
 | `data/scaling_factors.csv` | MODIS-to-VIIRS factors per 2° block |
 | `data/validation.csv` | Accuracy results |
 | `requirements.txt` | Python packages needed to run the app |
@@ -61,4 +62,6 @@ streamlit run app.py
 
 ## Data
 
-NASA FIRMS (Fire Information for Resource Management System) active fire products: MODIS Collection 6.1 and VIIRS 375 m (S-NPP and NOAA-20), yearly country files for Malaysia and Indonesia. https://www.earthdata.nasa.gov/data/tools/firms
+NASA FIRMS (Fire Information for Resource Management System) active fire products: MODIS Collection 6.1 and VIIRS 375 m (S-NPP and NOAA-20), yearly country files for Malaysia and Indonesia (2000–2025), plus FIRMS archive-request files for January to October 2026. https://www.earthdata.nasa.gov/data/tools/firms
+
+August to October 2026 are near-real-time data. Those files carry no source type, so non-vegetation sources (volcanoes, gas flares) could not be removed for those three months.
