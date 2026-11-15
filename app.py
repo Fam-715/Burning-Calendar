@@ -41,8 +41,9 @@ AREAS = {
 }
 
 
-@st.cache_data(show_spinner="Loading 25 years of hotspots…")
-def load_grid():
+@st.cache_data(show_spinner="Loading the hotspot record…")
+def load_grid(stamp):
+    # stamp = size and date of the data file, so a new dataset replaces the cached one
     df = pd.read_csv(DATA / "harmonised_grid_monthly.csv.gz")
     df["viirs_raw"] = np.where(df["ym"] < "2018-04", df["snpp_raw"], df["n20_raw"])
     # MODIS scaled with the 2-degree block factors for every month, so that in the years both
@@ -72,7 +73,8 @@ def source_of(ym):
     return "VIIRS NOAA-20, observed"
 
 
-grid = load_grid()
+_data_file = (DATA / "harmonised_grid_monthly.csv.gz").stat()
+grid = load_grid((_data_file.st_size, int(_data_file.st_mtime)))
 first_ym, last_ym = grid["ym"].min(), grid["ym"].max()
 first_year, last_year = int(first_ym[:4]), int(last_ym[:4])
 
