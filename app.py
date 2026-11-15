@@ -127,15 +127,16 @@ latest = m.iloc[-1]
 # ---------------- headline numbers ----------------
 k1, k2, k3, k4 = st.columns(4)
 total = view["hotspots"].sum()
-k1.metric("Total hotspots", f"{total / 1e6:.2f}M" if total >= 1e6 else f"{total:,.0f}")
-k1.caption(f"{y0} to {y1}")
+# the note under each number sits inside its card as a grey pill, like the "vs usual" pill
+k1.metric("Total hotspots", f"{total / 1e6:.2f}M" if total >= 1e6 else f"{total:,.0f}",
+          f"{y0} to {y1}", delta_color="off", delta_arrow="off")
 if len(annual):
     worst = int(annual["hotspots"].idxmax())
-    note = " (estimated from MODIS)" if worst < 2012 else ""
-    k2.metric("Worst year", str(worst))
-    k2.caption(f"{annual['hotspots'].max():,.0f} hotspots{note}")
-k3.metric("Usual peak month", MONTHS[int(season.idxmax()) - 1])
-k3.caption(f"median {season.max():,.0f} hotspots")
+    note = " (est. from MODIS)" if worst < 2012 else ""
+    k2.metric("Worst year", str(worst),
+              f"{annual['hotspots'].max():,.0f} hotspots{note}", delta_color="off", delta_arrow="off")
+k3.metric("Usual peak month", MONTHS[int(season.idxmax()) - 1],
+          f"median {season.max():,.0f} hotspots", delta_color="off", delta_arrow="off")
 change = (latest["hotspots"] - latest["usual"]) / latest["usual"] * 100 if latest["usual"] else 0.0
 k4.metric(f"Latest: {latest['label']}", f"{latest['hotspots']:,.0f}",
           f"{change:+.0f}% vs usual", delta_color="inverse")
@@ -191,8 +192,8 @@ with tab_month:
     a.metric(f"{pick_month} {pick_year}", f"{row['hotspots']:,.0f}")
     b.metric(f"Usual {pick_month} (median, {first_year}–{last_year})", f"{row['usual']:,.0f}")
     diff = (row["hotspots"] - row["usual"]) / row["usual"] * 100 if row["usual"] else 0.0
-    c.metric("Difference", f"{diff:+.0f}%")
-    c.caption(f"{row['times_usual']:.1f} times the usual")
+    c.metric("Difference", f"{diff:+.0f}%",
+             f"{row['times_usual']:.1f} times the usual", delta_color="off", delta_arrow="off")
 
     st.subheader(f"Every {pick_month} since {hist['year'].min()}")
     bars = (alt.Chart(hist).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
