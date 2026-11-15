@@ -367,25 +367,40 @@ with tab_trend:
 with tab_map:
     st.subheader(f"Where the hotspots were, {period}")
     cells_sum = (sel[sel["ym"].between(ym0, ym1)].groupby(["lat", "lon"], as_index=False)["hotspots"].sum())
-    top = cells_sum["hotspots"].max()
-    cells_sum["radius"] = 3000 + 10000 * np.sqrt(cells_sum["hotspots"] / top)
+    top = max(float(cells_sum["hotspots"].max()), 1.0)
+    cells_sum = cells_sum.sort_values("hotspots")            # busiest cells are drawn last, on top
+    strength = np.sqrt(cells_sum["hotspots"] / top)
+    cells_sum["radius"] = 5000 + 9000 * strength
     cells_sum["text"] = cells_sum["hotspots"].map(lambda v: f"{v:,.0f} hotspots")
-    # darker = more hotspots, so the pattern still shows when zoomed far out
-    cells_sum["colour"] = [[255, 138, 61, int(a)] for a in 45 + 200 * np.sqrt(cells_sum["hotspots"] / top)]
+    # same ember ramp as the calendar: deep red for a few hotspots, pale yellow for the most
+    cells_sum["colour"] = [ui.ramp_rgb(0.22 + 0.78 * s, ui.EMBER) + [235] for s in strength]
     box = pd.DataFrame({"path": [[[west, south], [east, south], [east, north], [west, north], [west, south]]]})
+    places = pd.DataFrame(
+        [("Peninsular Malaysia", 4.3, 102.2), ("Sumatra", -0.6, 101.6), ("Sarawak", 2.5, 113.0),
+         ("Sabah", 5.4, 117.0), ("Kalimantan", -1.2, 114.0), ("Java", -7.4, 110.5),
+         ("Sulawesi", -2.0, 120.6), ("Papua", -4.2, 138.2)], columns=["name", "lat", "lon"])
     layers = [
         pdk.Layer("ScatterplotLayer", cells_sum, get_position="[lon, lat]", get_radius="radius",
-                  get_fill_color="colour", radius_min_pixels=2, pickable=True),
-        pdk.Layer("PathLayer", box, get_path="path", get_color=[79, 157, 255], width_min_pixels=2),
+                  get_fill_color="colour", radius_min_pixels=2.5, pickable=True),
+        pdk.Layer("PathLayer", box, get_path="path", get_color=[110, 175, 255], width_min_pixels=2),
+        pdk.Layer("TextLayer", places, get_position="[lon, lat]", get_text="name", get_size=15,
+                  get_color=[255, 255, 255], background=True, get_background_color=[6, 9, 18, 205],
+                  background_padding=[7, 4], font_family="Segoe UI, Arial, sans-serif", font_weight=600,
+                  pickable=False),
     ]
     span = max(north - south, (east - west) / 2)
     zoom = float(np.clip(8.0 - np.log2(max(span, 0.5)), 3, 9))
-    st.pydeck_chart(pdk.Deck(layers=layers, map_style="dark",
+    ui.map_legend(top)
+    st.pydeck_chart(pdk.Deck(layers=layers, map_style="dark_no_labels",
                              initial_view_state=pdk.ViewState(latitude=(south + north) / 2,
                                                               longitude=(west + east) / 2, zoom=zoom),
-                             tooltip={"text": "{text}"}))
-    st.caption("Each circle is one 0.25° grid cell (about 28 km). Bigger, brighter circles mean more hotspots. "
-               "The blue outline is the selected area.")
+                             tooltip={"html": "<b>{text}</b>",
+                                      "style": {"backgroundColor": "#0e1626", "color": "#eef2fa",
+                                                "border": "1px solid #2a3a58", "borderRadius": "8px",
+                                                "fontSize": "14px", "padding": "6px 10px"}}),
+                    height=560)
+    st.caption("Each circle is one 0.25° grid cell (about 28 km). Brighter, larger circles mean more hotspots. "
+               "The blue outline is the selected area. Hover over a circle for its count.")
 
 # ---------------- 5. method ----------------
 with tab_method:

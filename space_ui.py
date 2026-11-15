@@ -39,7 +39,10 @@ CSS = """
   background: rgba(9,14,26,.78); border-right: 1px solid #1a2438;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
-[data-testid="stMainBlockContainer"] { padding-top: 2.4rem; }
+/* room at the bottom so the last lines clear the rising Earth and finish fading in */
+[data-testid="stMainBlockContainer"] { padding-top: 2.4rem; padding-bottom: 13rem; }
+[data-testid="stCaptionContainer"] { color: #a9b4c8; }
+[data-testid="stDeckGlJsonChart"] { border: 1px solid #25324d; border-radius: 12px; overflow: hidden; }
 
 /* ---------- headline numbers: glass cards that lift ---------- */
 [data-testid="stMetric"] {
@@ -366,6 +369,23 @@ def ramp(t, stops):
             rgb = _hex_to_rgb(c0) + f * (_hex_to_rgb(c1) - _hex_to_rgb(c0))
             return "#{:02x}{:02x}{:02x}".format(*[int(round(v)) for v in rgb])
     return stops[-1][1]
+
+
+def ramp_rgb(t, stops):
+    """Same as ramp(), as an [r, g, b] list for the map."""
+    h = ramp(t, stops)
+    return [int(h[i:i + 2], 16) for i in (1, 3, 5)]
+
+
+def map_legend(top):
+    """Colour scale shown above the map."""
+    stops = [(p, ramp(0.22 + 0.78 * p, EMBER)) for p in (0, .25, .5, .75, 1)]
+    ticks = "".join(f'<span style="left:{p * 100:.0f}%">{_compact(max(top * p * p, 1))}</span>'
+                    for p in (0, .25, .5, .75, 1))
+    st.html(f'<div class="bc-legend" style="margin-left:0"><div class="bc-scale">'
+            f'<div class="bc-bar" style="background:{_gradient(stops)}"></div>'
+            f'<div class="bc-ticks">{ticks}</div></div>'
+            f'<span>Hotspots in each grid cell over the period</span></div>')
 
 
 def _gradient(stops):
