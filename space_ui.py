@@ -232,10 +232,17 @@ CSS = """
 @supports (animation-timeline: view()) {
   [data-testid="stMain"] { scroll-timeline: --bc-page block; }
 
-  /* each block rises into place as it enters the screen */
+  /* each block rises into place as it enters the screen, and is marked "seen" (--bc-seen: 1)
+     once most of it is on screen; the rules further down start their animations from that mark */
   [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:not(:has(.bc-sky)) {
-    animation: bc-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 150px;
+    animation: bc-reveal linear both, bc-seen linear both; animation-timeline: view(), view();
+    animation-range: entry 0% entry 150px, entry 20% entry 100%;
   }
+  /* charts, the map, number cards and the calendar skip the rise: they stay hidden, then play in full */
+  [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:has([data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"], .bc-cal) {
+    animation: bc-seen linear both; animation-timeline: view(); animation-range: entry 20% entry 100%;
+  }
+  .bc-row:not(.bc-head) { animation: bc-seen linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
   /* the banner sinks back as it leaves */
   .bc-hero { animation: bc-hero-out linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
 
@@ -278,38 +285,42 @@ CSS = """
   /* room below the last block so everything can finish animating in */
   [data-testid="stMainBlockContainer"] { padding-bottom: 12rem; }
 
-  /* charts draw themselves as you reach them: lines from left to right, bars up from the baseline */
-  [data-testid="stVegaLiteChart"] {
-    animation: bc-wipe linear both; animation-timeline: view(); animation-range: entry 30% contain 30%;
+  /* Not yet seen: hidden. These rules only exist in browsers with style queries, so nothing
+     can be left hidden in a browser that cannot run the animation. */
+  @container style(--bc-seen: 0) {
+    [data-testid="stVegaLiteChart"] { clip-path: inset(0 100% 0 0); }
+    [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { clip-path: inset(100% 0 0 0); }
+    [data-testid="stDeckGlJsonChart"] { clip-path: circle(0% at 50% 50%); }
+    [data-testid="stMetric"] { opacity: 0; }
+    .bc-cell, .bc-empty, .bc-yr { opacity: 0; animation: none; }
+    [data-testid="stHeading"] h3 { background-size: 0 2px; }
   }
-  [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { animation-name: bc-grow; }
-  /* the map opens from its centre */
-  [data-testid="stDeckGlJsonChart"] {
-    animation: bc-iris linear both; animation-timeline: view(); animation-range: entry 20% contain 25%;
-  }
-  /* number cards pop in (uses "scale" so the hover lift, which uses "transform", still works) */
-  [data-testid="stMetric"] {
-    animation: bc-pop linear both; animation-timeline: view(); animation-range: cover 0% cover 22%;
-  }
-  /* calendar rows slide in one after another */
-  .bc-row { position: relative; }
-  .bc-row:hover { z-index: 30; }
-  .bc-row:not(.bc-head) {
-    animation: bc-row-in linear both; animation-timeline: view(); animation-range: cover 0% cover 14%;
+  /* Seen: the whole animation plays once, on its own clock, however fast the user scrolls */
+  @container style(--bc-seen: 1) {
+    /* line and scatter charts draw from left to right, bar charts grow up from the baseline */
+    [data-testid="stVegaLiteChart"] { animation: bc-wipe 1.2s cubic-bezier(.3,.6,.2,1) both; }
+    [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { animation-name: bc-grow; }
+    /* the map opens from its centre */
+    [data-testid="stDeckGlJsonChart"] { animation: bc-iris 1.3s cubic-bezier(.3,.6,.2,1) both; }
+    /* number cards pop in ("scale", not "transform", so the hover lift still works) */
+    [data-testid="stMetric"] { animation: bc-pop .6s cubic-bezier(.2,.8,.2,1) both; }
+    /* each calendar row lights up from January to December */
+    .bc-cell { animation-delay: calc((var(--i) - var(--r, 0)) * 28ms); }
+    .bc-yr, .bc-empty { animation: bc-fade .4s ease both; }
   }
   /* section headings get an ember underline that draws in */
   [data-testid="stHeading"] h3 {
     padding-bottom: .45rem;
     background: linear-gradient(90deg, #ff8a3d, rgba(255,138,61,0)) no-repeat 0 100% / 110px 2px;
-    animation: bc-underline linear both; animation-timeline: view(); animation-range: cover 0% cover 25%;
+    transition: background-size .8s ease .15s;
   }
 
+  @keyframes bc-seen      { from { --bc-seen: 0; } to { --bc-seen: 1; } }
   @keyframes bc-wipe      { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
   @keyframes bc-grow      { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
   @keyframes bc-iris      { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
-  @keyframes bc-pop       { from { opacity: 0; scale: .88; } }
-  @keyframes bc-row-in    { from { opacity: 0; transform: translateX(-36px); } }
-  @keyframes bc-underline { from { background-size: 0 2px; } }
+  @keyframes bc-pop       { from { opacity: 0; scale: .85; } }
+  @keyframes bc-fade      { from { opacity: 0; } }
   @keyframes bc-reveal   { from { opacity: 0; transform: translateY(40px) scale(.97); } }
   @keyframes bc-hero-out { to { opacity: .2; transform: translateY(40px) scale(.93); } }
   @keyframes bc-progress { to { transform: scaleX(1); } }
@@ -324,8 +335,8 @@ CSS = """
 @media (prefers-reduced-motion: reduce) {
   .bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
   [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"], .bc-hero { animation: none; }
-  [data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"],
-  .bc-row:not(.bc-head), [data-testid="stHeading"] h3 { animation: none; }
+  .bc-row:not(.bc-head) { animation: none; }
+  [data-testid="stHeading"] h3 { transition: none; }
   .bc-hero-stars, .bc-fire, .bc-orbit, .bc-stars, .bc-cell, .bc-hot::after { animation: none; }
   .bc-meteor, .bc-ember { display: none; }
   .bc-cell, .bc-tip, [data-testid="stMetric"] { transition: none; }
@@ -470,6 +481,6 @@ def calendar_html(view, by_count=True):
             hot = " bc-hot" if t >= 0.8 else ""
             cells.append(f'<div class="bc-cell bc-m{month}{side}{low}{hot}" style="--c:{colour};--i:{i + month}">'
                          f'<span class="bc-tip">{tip}</span></div>')
-        out.append('<div class="bc-row">' + "".join(cells) + "</div>")
+        out.append(f'<div class="bc-row" style="--r:{i}">' + "".join(cells) + "</div>")
     out.append("</div>")
     return "".join(out)
