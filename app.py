@@ -246,7 +246,7 @@ with tab_month:
                     tooltip=TIP))
     med = pd.DataFrame({"usual": [row["usual"]]})
     rule = alt.Chart(med).mark_rule(color=INK2, strokeWidth=1.5).encode(y="usual:Q")
-    st.altair_chart((bars + rule).properties(height=320), width="stretch")
+    st.altair_chart((bars + rule).properties(height=320), width="stretch", key="bars_month")
     st.caption(f"The horizontal line is the median {pick_month} ({row['usual']:,.0f} hotspots).")
 
     st.subheader("When the fire season usually falls")
@@ -257,7 +257,7 @@ with tab_month:
                           tooltip=[alt.Tooltip("mon:N", title="Month"),
                                    alt.Tooltip("median:Q", title="Median hotspots", format=",.0f")])
                   .properties(height=240))
-    st.altair_chart(seas_chart, width="stretch")
+    st.altair_chart(seas_chart, width="stretch", key="bars_season")
     if season.max() > 0:
         busy = [i for i in range(1, 13) if season.get(i, 0) >= 0.5 * season.max()]
         share = sum(season.get(i, 0) for i in busy) / season.sum() * 100

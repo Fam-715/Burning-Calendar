@@ -275,6 +275,41 @@ CSS = """
   .bc-scan-sat { position: absolute; left: 0; top: 0; width: 0; height: 0;
                  animation: bc-descend linear both; animation-timeline: --bc-page; }
 
+  /* room below the last block so everything can finish animating in */
+  [data-testid="stMainBlockContainer"] { padding-bottom: 12rem; }
+
+  /* charts draw themselves as you reach them: lines from left to right, bars up from the baseline */
+  [data-testid="stVegaLiteChart"] {
+    animation: bc-wipe linear both; animation-timeline: view(); animation-range: entry 30% contain 30%;
+  }
+  [class*="st-key-bars_"] [data-testid="stVegaLiteChart"] { animation-name: bc-grow; }
+  /* the map opens from its centre */
+  [data-testid="stDeckGlJsonChart"] {
+    animation: bc-iris linear both; animation-timeline: view(); animation-range: entry 20% contain 25%;
+  }
+  /* number cards pop in (uses "scale" so the hover lift, which uses "transform", still works) */
+  [data-testid="stMetric"] {
+    animation: bc-pop linear both; animation-timeline: view(); animation-range: cover 0% cover 22%;
+  }
+  /* calendar rows slide in one after another */
+  .bc-row { position: relative; }
+  .bc-row:hover { z-index: 30; }
+  .bc-row:not(.bc-head) {
+    animation: bc-row-in linear both; animation-timeline: view(); animation-range: cover 0% cover 14%;
+  }
+  /* section headings get an ember underline that draws in */
+  [data-testid="stHeading"] h3 {
+    padding-bottom: .45rem;
+    background: linear-gradient(90deg, #ff8a3d, rgba(255,138,61,0)) no-repeat 0 100% / 110px 2px;
+    animation: bc-underline linear both; animation-timeline: view(); animation-range: cover 0% cover 25%;
+  }
+
+  @keyframes bc-wipe      { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes bc-grow      { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes bc-iris      { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
+  @keyframes bc-pop       { from { opacity: 0; scale: .88; } }
+  @keyframes bc-row-in    { from { opacity: 0; transform: translateX(-36px); } }
+  @keyframes bc-underline { from { background-size: 0 2px; } }
   @keyframes bc-reveal   { from { opacity: 0; transform: translateY(40px) scale(.97); } }
   @keyframes bc-hero-out { to { opacity: .2; transform: translateY(40px) scale(.93); } }
   @keyframes bc-progress { to { transform: scaleX(1); } }
@@ -289,6 +324,8 @@ CSS = """
 @media (prefers-reduced-motion: reduce) {
   .bc-progress, .bc-limb, .bc-scan, .bc-glow { display: none; }
   [data-testid="stMainBlockContainer"] [data-testid="stElementContainer"], .bc-hero { animation: none; }
+  [data-testid="stVegaLiteChart"], [data-testid="stDeckGlJsonChart"], [data-testid="stMetric"],
+  .bc-row:not(.bc-head), [data-testid="stHeading"] h3 { animation: none; }
   .bc-hero-stars, .bc-fire, .bc-orbit, .bc-stars, .bc-cell, .bc-hot::after { animation: none; }
   .bc-meteor, .bc-ember { display: none; }
   .bc-cell, .bc-tip, [data-testid="stMetric"] { transition: none; }
