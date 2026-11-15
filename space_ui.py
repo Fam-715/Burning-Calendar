@@ -382,7 +382,23 @@ def _compact(v):
     return f"{v:.0f}"
 
 
+def standalone(title, body):
+    """A complete web page holding the calendar, for the download button."""
+    return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            f"<title>{html.escape(title)}</title>{CSS}</head>"
+            '<body style="margin:0;padding:28px 32px 48px;background:#060912;color:#e6ebf5;'
+            'font-family:\'Segoe UI\',Arial,sans-serif">'
+            f'<h2 style="margin:0 0 4px;font-weight:600">{html.escape(title)}</h2>'
+            '<p style="margin:0 0 20px;color:#8b97ad;font-size:.9rem">VIIRS-equivalent hotspots from NASA FIRMS '
+            "active-fire data (MODIS and VIIRS, harmonised). Hover over a square for the figures.</p>"
+            f"{body}</body></html>")
+
+
 def calendar(view, by_count=True):
+    st.html(calendar_html(view, by_count))
+
+
+def calendar_html(view, by_count=True):
     """Burning calendar: one row per year, one square per month. Squares lift on hover."""
     top = max(float(view["hotspots"].max()), 1.0)
     years = sorted(view["year"].unique())
@@ -419,4 +435,4 @@ def calendar(view, by_count=True):
                          f'<span class="bc-tip">{tip}</span></div>')
         out.append('<div class="bc-row">' + "".join(cells) + "</div>")
     out.append("</div>")
-    st.html("".join(out))
+    return "".join(out)

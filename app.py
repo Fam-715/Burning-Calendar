@@ -45,7 +45,16 @@ AREAS = {
 def load_grid():
     df = pd.read_csv(DATA / "harmonised_grid_monthly.csv.gz")
     df["viirs_raw"] = np.where(df["ym"] < "2018-04", df["snpp_raw"], df["n20_raw"])
-    return df
+    # MODIS scaled with the 2-degree block factors for every month, so that in the years both
+    # sensors flew it can be checked against what VIIRS actually recorded
+    fac = pd.read_csv(DATA / "scaling_factors.csv")[["daynight", "lat_from", "lon_from", "factor_terra_aqua"]]
+    df["lat_from"] = np.floor(df["lat"] / 2) * 2
+    df["lon_from"] = np.floor(df["lon"] / 2) * 2
+    df = df.merge(fac, on=["daynight", "lat_from", "lon_from"], how="left")
+    typical = df.groupby("daynight")["factor_terra_aqua"].transform("median")
+    df["factor_terra_aqua"] = df["factor_terra_aqua"].fillna(typical).fillna(0.0)
+    df["modis_scaled"] = df["modis_raw"] * df["factor_terra_aqua"]
+    return df.drop(columns=["lat_from", "lon_from"])
 
 
 @st.cache_data
@@ -87,7 +96,18 @@ else:
         st.stop()
 
 st.sidebar.header("Period")
-y0, y1 = st.sidebar.slider("Years", first_year, last_year, (min(2001, last_year), last_year))
+all_months = list(pd.period_range(first_ym, last_ym, freq="M").strftime("%Y-%m"))
+
+
+def month_name(ym):
+    return f"{MONTHS[int(ym[5:]) - 1]} {ym[:4]}"
+
+
+start_default = "2001-01" if "2001-01" in all_months else all_months[0]
+ym0, ym1 = st.sidebar.select_slider("From / to (month)", options=all_months,
+                                    value=(start_default, all_months[-1]), format_func=month_name)
+y0, y1 = int(ym0[:4]), int(ym1[:4])
+period = f"{month_name(ym0)} to {month_name(ym1)}"
 dn_label = st.sidebar.radio("Time of detection", ["Day and night", "Day only", "Night only"])
 
 sel = grid[grid["lat"].between(south, north) & grid["lon"].between(west, east)]
@@ -105,8 +125,7 @@ if sel.empty:
     st.stop()
 
 # ---------------- monthly series for the area ----------------
-all_months = pd.period_range(first_ym, last_ym, freq="M").strftime("%Y-%m")
-m = (sel.groupby("ym")[["hotspots", "modis_raw", "viirs_raw"]].sum()
+m = (sel.groupby("ym")[["hotspots", "modis_raw", "viirs_raw", "modis_scaled"]].sum()
         .reindex(all_months, fill_value=0).rename_axis("ym").reset_index())
 m["year"] = m["ym"].str[:4].astype(int)
 m["month"] = m["ym"].str[5:].astype(int)
@@ -116,7 +135,7 @@ m["usual"] = m.groupby("month")["hotspots"].transform("median")      # median of
 m["times_usual"] = (m["hotspots"] + 1) / (m["usual"] + 1)
 m["log_ratio"] = np.log2(m["times_usual"]).clip(-3, 3)
 m["label"] = m["mon"] + " " + m["year"].astype(str)
-view = m[m["year"].between(y0, y1)]
+view = m[m["ym"].between(ym0, ym1)]
 
 months_per_year = view.groupby("year")["month"].count()
 full_years = months_per_year[months_per_year == 12].index
@@ -129,7 +148,7 @@ k1, k2, k3, k4 = st.columns(4)
 total = view["hotspots"].sum()
 # the note under each number sits inside its card as a grey pill, like the "vs usual" pill
 k1.metric("Total hotspots", f"{total / 1e6:.2f}M" if total >= 1e6 else f"{total:,.0f}",
-          f"{y0} to {y1}", delta_color="off", delta_arrow="off")
+          period, delta_color="off", delta_arrow="off")
 if len(annual):
     worst = int(annual["hotspots"].idxmax())
     note = " (est. from MODIS)" if worst < 2012 else ""
@@ -146,8 +165,8 @@ if (north - south) * (east - west) < SMALL_AREA_DEG2:
                "for areas this small a single month can be off by 30% or more. "
                "Read the pattern, not the exact number.", icon="⚠️")
 
-tab_cal, tab_month, tab_trend, tab_map, tab_method = st.tabs(
-    ["Burning calendar", "A month against its history", "Trend and sensors", "Map", "Method and data"])
+tab_cal, tab_trend, tab_month, tab_map, tab_method = st.tabs(
+    ["Burning calendar", "Harmonisation", "A month against its history", "Map", "Method and data"])
 
 TIP = [alt.Tooltip("label:N", title="Month"),
        alt.Tooltip("hotspots:Q", title="Hotspots", format=",.0f"),
@@ -160,7 +179,8 @@ with tab_cal:
     st.subheader(f"{area_name}: hotspots by month")
     mode = st.radio("Colour shows", ["Number of hotspots", "Compared with the usual for that month"],
                     horizontal=True, label_visibility="collapsed")
-    ui.calendar(view, by_count=(mode == "Number of hotspots"))
+    cal_html = ui.calendar_html(view, by_count=(mode == "Number of hotspots"))
+    st.html(cal_html)
     st.caption("Each square is one month. Hover over a square to lift it and see the figures. Before February 2012 the counts are "
                "MODIS detections scaled to VIIRS-equivalent; from then on they are VIIRS observations. "
                "\"Usual\" is the median for that calendar month across the whole record.")
@@ -169,14 +189,27 @@ with tab_cal:
         table = view.pivot(index="year", columns="mon", values="hotspots").reindex(columns=MONTHS)
         st.dataframe(table.round(0), width="stretch")
 
+    st.markdown("**Download this search**")
     d1, d2 = st.columns(2)
     cal_csv = view[["ym", "year", "month", "hotspots", "usual", "times_usual",
                     "modis_raw", "viirs_raw", "source"]].round(2)
-    d1.download_button("Download this calendar (CSV)", cal_csv.to_csv(index=False),
+    d1.download_button("Calendar, month by month (CSV)", cal_csv.to_csv(index=False),
                        "burning_calendar.csv", "text/csv")
-    cells = sel[sel["year"].between(y0, y1)].drop(columns=["snpp_raw", "n20_raw"])
-    d2.download_button("Download gridded hotspots for this search (CSV)", cells.to_csv(index=False),
+    cells = (sel[sel["ym"].between(ym0, ym1)]
+             .drop(columns=["snpp_raw", "n20_raw", "factor_terra_aqua", "modis_scaled"]))
+    d2.download_button("Gridded hotspots, 0.25° cells (CSV)", cells.to_csv(index=False),
                        "hotspots_grid.csv", "text/csv")
+    d3, d4 = st.columns(2)
+    yearly = (view.groupby("year")
+                  .agg(months=("month", "count"), hotspots=("hotspots", "sum"), modis_raw=("modis_raw", "sum"),
+                       busiest_month=("hotspots", "idxmax"))
+                  .reset_index())
+    yearly["busiest_month"] = yearly["busiest_month"].map(view["mon"])
+    d3.download_button("Yearly summary (CSV)", yearly.round(0).to_csv(index=False),
+                       "burning_calendar_yearly.csv", "text/csv")
+    d4.download_button("Calendar picture (HTML, opens in any browser)",
+                       ui.standalone(f"Burning calendar: {area_name}, {period}", cal_html),
+                       "burning_calendar.html", "text/html")
 
 # ---------------- 2. one month against its history ----------------
 with tab_month:
@@ -217,10 +250,96 @@ with tab_month:
                                    alt.Tooltip("median:Q", title="Median hotspots", format=",.0f")])
                   .properties(height=240))
     st.altair_chart(seas_chart, width="stretch")
+    if season.max() > 0:
+        busy = [i for i in range(1, 13) if season.get(i, 0) >= 0.5 * season.max()]
+        share = sum(season.get(i, 0) for i in busy) / season.sum() * 100
+        st.markdown(f"**Critical period: {', '.join(MONTHS[i - 1] for i in busy)}.** In a typical year these "
+                    f"months hold about {share:.0f}% of the area's hotspots.")
+
+    st.subheader("The most unusual months in the selected period")
+    odd = (view[view["hotspots"] > 0].nlargest(10, "times_usual")
+           [["label", "hotspots", "usual", "times_usual", "source"]]
+           .rename(columns={"label": "Month", "hotspots": "Hotspots", "usual": "Usual for that month",
+                            "times_usual": "Times the usual", "source": "Source"}))
+    odd["Hotspots"] = odd["Hotspots"].round(0)
+    odd["Usual for that month"] = odd["Usual for that month"].round(0)
+    odd["Times the usual"] = odd["Times the usual"].round(1)
+    st.dataframe(odd, hide_index=True, width="stretch")
+    st.caption("Months ranked by how far they were above the median for the same calendar month.")
 
 # ---------------- 3. trend and sensors ----------------
 with tab_trend:
-    st.subheader("Why the two sensors cannot simply be joined")
+    st.subheader("Does it still matter which sensor saw the fire?")
+    st.markdown(
+        "MODIS and VIIRS have flown together since February 2012. That overlap is the test: scale the MODIS "
+        "counts with the harmonisation factors, then see how close they come to what VIIRS actually recorded "
+        f"in this area. All figures below are for {area_name}, {month_name('2012-02')} to {month_name(last_ym)}.")
+    ov = m[m["ym"] >= "2012-02"].copy()
+    raw_m, obs_v = float(ov["modis_raw"].sum()), float(ov["viirs_raw"].sum())
+    if raw_m <= 0 or obs_v <= 0:
+        st.info("Not enough MODIS and VIIRS detections in this area to compare the two sensors.")
+    else:
+        unseen = ov[ov["year"] >= 2022]
+        unseen_total = float(unseen["viirs_raw"].sum())
+        err = ((unseen["modis_scaled"] - unseen["viirs_raw"]).abs().sum() / unseen_total
+               if unseen_total > 0 else None)
+        spread = ov["modis_scaled"].std() > 0 and ov["viirs_raw"].std() > 0
+        r2 = float(np.corrcoef(ov["modis_scaled"], ov["viirs_raw"])[0, 1] ** 2) if spread else None
+
+        h1, h2, h3, h4 = st.columns(4)
+        h1.metric("MODIS, as recorded", f"{raw_m:,.0f}", "1 km pixels", delta_color="off", delta_arrow="off")
+        h2.metric("VIIRS, as recorded", f"{obs_v:,.0f}", "375 m pixels", delta_color="off", delta_arrow="off")
+        h3.metric("VIIRS hotspots per MODIS hotspot", f"{obs_v / raw_m:.1f}×", "before harmonising",
+                  delta_color="off", delta_arrow="off")
+        h4.metric("Monthly match after scaling (R²)", "n/a" if r2 is None else f"{r2:.2f}",
+                  "no unseen years" if err is None else f"{err * 100:.0f}% error, 2022–{last_year}",
+                  delta_color="off", delta_arrow="off")
+
+        st.subheader("Scaled MODIS against real VIIRS, month by month")
+        ov["period"] = np.where(ov["year"] <= 2021, "2012–2021, used to learn the factors",
+                                f"2022–{last_year}, never seen by the method")
+        top_axis = float(max(ov["modis_scaled"].max(), ov["viirs_raw"].max()))
+        x_enc = alt.X("modis_scaled:Q", title="MODIS scaled to VIIRS-equivalent (hotspots in the month)",
+                      axis=alt.Axis(format="~s"))
+        y_enc = alt.Y("viirs_raw:Q", title="VIIRS observed (hotspots in the month)", axis=alt.Axis(format="~s"))
+        diagonal = (alt.Chart(pd.DataFrame({"modis_scaled": [0.0, top_axis], "viirs_raw": [0.0, top_axis]}))
+                    .mark_line(color=GREY, strokeDash=[6, 4]).encode(x=x_enc, y=y_enc))
+        dots = (alt.Chart(ov).mark_circle(size=60, opacity=0.85)
+                .encode(x=x_enc, y=y_enc,
+                        color=alt.Color("period:N",
+                                        scale=alt.Scale(domain=["2012–2021, used to learn the factors",
+                                                                f"2022–{last_year}, never seen by the method"],
+                                                        range=[BLUE, ORANGE]),
+                                        legend=alt.Legend(title=None, orient="top")),
+                        tooltip=[alt.Tooltip("label:N", title="Month"),
+                                 alt.Tooltip("modis_scaled:Q", title="MODIS scaled", format=",.0f"),
+                                 alt.Tooltip("viirs_raw:Q", title="VIIRS observed", format=",.0f"),
+                                 alt.Tooltip("modis_raw:Q", title="MODIS as recorded", format=",.0f")]))
+        st.altair_chart((diagonal + dots).properties(height=380), width="stretch")
+        st.caption("Each dot is one month. A dot on the dashed line means scaled MODIS matched VIIRS exactly. "
+                   "Orange dots are months the method never saw when the factors were learned.")
+
+        st.subheader("Year by year in the overlap")
+        by_year = (ov.groupby("year")[["viirs_raw", "modis_scaled", "modis_raw"]].sum()
+                     .rename(columns={"viirs_raw": "VIIRS observed", "modis_scaled": "MODIS scaled",
+                                      "modis_raw": "MODIS as recorded"})
+                     .reset_index().melt("year", var_name="series", value_name="count"))
+        overlap = (alt.Chart(by_year).mark_line(strokeWidth=2, point=alt.OverlayMarkDef(size=45))
+                   .encode(x=alt.X("year:O", title=None, axis=alt.Axis(labelAngle=0)),
+                           y=alt.Y("count:Q", title="Hotspots per year", axis=alt.Axis(format="~s")),
+                           color=alt.Color("series:N",
+                                           scale=alt.Scale(domain=["VIIRS observed", "MODIS scaled",
+                                                                   "MODIS as recorded"],
+                                                           range=[BLUE, "#f2c14e", ORANGE]),
+                                           legend=alt.Legend(title=None, orient="top")),
+                           tooltip=[alt.Tooltip("year:O", title="Year"), alt.Tooltip("series:N", title="Series"),
+                                    alt.Tooltip("count:Q", title="Hotspots", format=",.0f")]))
+        st.altair_chart(overlap.properties(height=300), width="stretch")
+        st.caption("If harmonisation works, the yellow line (MODIS after scaling) follows the blue line "
+                   "(VIIRS) and leaves the orange line (MODIS as recorded) far below. 2012 covers February "
+                   "to December only.")
+
+    st.subheader("The whole record, before and after")
     if len(annual) < 2:
         st.info("Choose at least two full years to see the trend.")
     else:
@@ -246,8 +365,8 @@ with tab_trend:
 
 # ---------------- 4. map ----------------
 with tab_map:
-    st.subheader(f"Where the hotspots were, {y0} to {y1}")
-    cells_sum = (sel[sel["year"].between(y0, y1)].groupby(["lat", "lon"], as_index=False)["hotspots"].sum())
+    st.subheader(f"Where the hotspots were, {period}")
+    cells_sum = (sel[sel["ym"].between(ym0, ym1)].groupby(["lat", "lon"], as_index=False)["hotspots"].sum())
     top = cells_sum["hotspots"].max()
     cells_sum["radius"] = 3000 + 10000 * np.sqrt(cells_sum["hotspots"] / top)
     cells_sum["text"] = cells_sum["hotspots"].map(lambda v: f"{v:,.0f} hotspots")
@@ -293,6 +412,7 @@ Error is the total absolute difference between scaled MODIS and actual VIIRS, as
 - Quiet fire years are underestimated by roughly 10 to 25%, because MODIS misses more of the small fires.
 - November 2000 to July 2002 uses the Terra satellite alone and is less certain. (The Terra-only factor is applied to those months only. Its error on 2022–2025 is high because Terra's detections fell away in those years.)
 - The most recent months of any update are near-real-time data, not final science quality.
+- The record currently ends in December 2025, the last month in the FIRMS yearly country files. 2026 is not included yet.
 
 **Data.** NASA FIRMS active fire products: MODIS Collection 6.1 (MCD14ML) and VIIRS 375 m (S-NPP and NOAA-20), for Malaysia and Indonesia.
 """)
